@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>F-150 MPG Estimator</title>
+
+<!-- F-150 MPG Estimator — drop this full file onto a static host -->
+<style>
+  /* Simple responsive styling */
+  .mpg-widget{max-width:780px;margin:18px auto;font-family:Arial,Helvetica,sans-serif;border:1px solid #e1e1e1;border-radius:8px;padding:16px;background:#fff}
+  .mpg-widget h3{margin:0 0 10px;font-size:18px;color:#0a2e6b}
+  .mpg-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+  .mpg-field{flex:1 1 220px;min-width:180px}
+  label{display:block;font-size:13px;color:#333;margin-bottom:6px}
+  input[type="number"], select, input[type="range"]{width:100%;padding:8px;border-radius:6px;border:1px solid #cfcfcf;font-size:14px}
+  .small{font-size:12px;color:#666;margin-top:4px}
+  .result{margin-top:12px;padding:12px;border-radius:6px;background:#f7fbff;border:1px solid #e6f0ff}
+  .muted{color:#666;font-size:13px}
+  .btn-row{display:flex;gap:8px;margin-top:10px}
+  button{background:#0a57a4;color:#fff;border:none;padding:10px 14px;border-radius:6px;cursor:pointer}
+  button.secondary{background:#f4f6f8;color:#222;border:1px solid #d0d6dc}
+  .calc-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  @media(max-width:560px){.calc-grid{grid-template-columns:1fr}}
+  .explain{font-size:13px;color:#444;line-height:1.4;margin-top:8px}
+  .footnote{font-size:12px;color:#777;margin-top:10px}
+</style>
+</head>
+<body>
+<div class="mpg-widget" role="region" aria-label="F-150 MPG estimator">
+  <h3>F-150 MPG Estimator — Local Conditions</h3>
+  <div class="muted">Choose an engine preset, set your driving mix and local conditions (towing, hills, wind). The tool estimates adjusted MPG and miles per tank.</div>
+
+  <div class="mpg-row">
+    <div class="mpg-field">
+      <label for="engine">Engine preset</label>
+      <select id="engine">
+        <option value="powerboost">3.5L PowerBoost (Hybrid) — est. 22/24/23</option>
+        <option value="2.7">2.7L EcoBoost — est. 19/25/21</option>
+        <option value="3.5">3.5L EcoBoost — est. 17/25/20</option>
+        <option value="5.0">5.0L V8 — est. 16/24/19</option>
+        <option value="diesel">3.0L PowerStroke Diesel — est. 20/27/23</option>
+        <option value="highout">3.5L High-Output (Raptor/Tremor) — est. 14/18/16</option>
+        <option value="custom">Custom MPG</option>
+      </select>
+      <div class="small">Pick a common F-150 engine or choose Custom to enter your own MPG.</div>
+    </div>
+
+    <div class="mpg-field" id="customMPGfield" style="display:none">
+      <label for="customCity">Custom city MPG</label>
+      <input id="customCity" type="number" min="1" step="0.1" value="20">
+      <div class="small">If you selected Custom, enter city MPG.</div>
+    </div>
+
+    <div class="mpg-field" id="customHighwayField" style="display:none">
+      <label for="customHwy">Custom highway MPG</label>
+      <input id="customHwy" type="number" min="1" step="0.1" value="25">
+      <div class="small">Enter highway MPG for a custom baseline.</div>
+    </div>
+  </div>
+
+  <div class="calc-grid">
+    <div>
+      <label for="mix">Driving mix — % highway</label>
+      <input id="mix" type="number" min="0" max="100" step="1" value="60">
+      <div class="small">Higher highway % usually increases average MPG.</div>
+    </div>
+
+    <div>
+      <label for="tank">Fuel tank (gallons)</label>
+      <input id="tank" type="number" min="10" step="0.1" value="26">
+      <div class="small">Edit to match your truck (defaults are editable).</div>
+    </div>
+  </div>
+
+  <div class="mpg-row">
+    <div class="mpg-field">
+      <label for="towing">Towing / load (% of heavy load)</label>
+      <input id="towing" type="number" min="0" max="200" step="1" value="0">
+      <div class="small">Enter % load effect (e.g., 50 for moderate towing; 100 for heavy towing).</div>
+    </div>
+
+    <div class="mpg-field">
+      <label for="incline">Average incline (% grade)</label>
+      <input id="incline" type="number" min="0" max="20" step="0.1" value="0">
+      <div class="small">Average uphill grade on routes (small hills = 1–3%).</div>
+    </div>
+  </div>
+
+  <div class="mpg-row">
+    <div class="mpg-field">
+      <label for="wind">Wind effect (tailwind negative, headwind positive) %</label>
+      <input id="wind" type="number" min="-50" max="50" step="1" value="0">
+      <div class="small">Positive = headwind (worse MPG), negative = tailwind (better MPG).</div>
+    </div>
+
+    <div class="mpg-field">
+      <label for="extraWeight">Extra cargo / passengers (lbs)</label>
+      <input id="extraWeight" type="number" min="0" step="10" value="0">
+      <div class="small">Useful for tools, gear, or full load of passengers.</div>
+    </div>
+  </div>
+
+  <div class="mpg-row">
+    <div class="mpg-field">
+      <label for="tire">Tire / drag penalty (%)</label>
+      <input id="tire" type="number" min="0" max="40" step="0.5" value="0">
+      <div class="small">Bigger tires or aggressive tread can reduce MPG.</div>
+    </div>
+
+    <div class="mpg-field">
+      <label for="speed">Average highway speed (mph)</label>
+      <input id="speed" type="number" min="40" max="85" step="1" value="65">
+      <div class="small">Higher speeds usually lower highway MPG.</div>
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button id="calcBtn" type="button">Estimate MPG</button>
+    <button class="secondary" id="resetBtn" type="button">Reset</button>
+  </div>
+
+  <div class="result" id="resultArea" aria-live="polite" style="display:none">
+    <div><strong>Adjusted MPG:</strong> <span id="adjMPG">—</span> MPG (combined)</div>
+    <div><strong>Miles per tank:</strong> <span id="milesTank">—</span> miles</div>
+    <div class="explain"><strong>How we adjusted it:</strong> <span id="breakdown">—</span></div>
+    <div class="footnote">Note: This is an estimator for planning. Real-world MPG varies with driving style, vehicle condition, and environment.</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const presets = {
+    powerboost:{city:22, highway:24, combined:23},
+    "2.7":{city:19, highway:25, combined:21},
+    "3.5":{city:17, highway:25, combined:20},
+    "5.0":{city:16, highway:24, combined:19},
+    diesel:{city:20, highway:27, combined:23},
+    highout:{city:14, highway:18, combined:16}
+  };
+
+  const $ = id => document.getElementById(id);
+  const engineSel = $('engine');
+  const customCity = $('customCity');
+  const customHwy = $('customHwy');
+  const customField = $('customMPGfield');
+  const customField2 = $('customHighwayField');
+
+  engineSel.addEventListener('change', function(){
+    const v = engineSel.value;
+    if(v === 'custom'){
+      customField.style.display = 'block';
+      customField2.style.display = 'block';
+    } else {
+      customField.style.display = 'none';
+      customField2.style.display = 'none';
+    }
+  });
+
+  function reset(){
+    $('engine').value = 'powerboost';
+    $('customCity').value = 20;
+    $('customHwy').value = 25;
+    $('mix').value = 60;
+    $('tank').value = 26;
+    $('towing').value = 0;
+    $('incline').value = 0;
+    $('wind').value = 0;
+    $('extraWeight').value = 0;
+    $('tire').value = 0;
+    $('speed').value = 65;
+    $('resultArea').style.display = 'none';
+  }
+
+  $('resetBtn').addEventListener('click', reset);
+
+  function estimate(){
+    const preset = engineSel.value;
+    let baseCity, baseHwy;
+    if(preset==='custom'){
+      baseCity = parseFloat(customCity.value) || 18;
+      baseHwy = parseFloat(customHwy.value) || 24;
+    } else {
+      baseCity = presets[preset].city;
+      baseHwy = presets[preset].highway;
+    }
+
+    const mix = clamp(parseFloat($('mix').value),0,100)/100;
+    const tank = Math.max(1, parseFloat($('tank').value)||20);
+    const towing = Math.max(0, parseFloat($('towing').value)||0);
+    const incline = Math.max(0, parseFloat($('incline').value)||0);
+    const wind = parseFloat($('wind').value)||0;
+    const extraWeight = Math.max(0, parseFloat($('extraWeight').value)||0);
+    const tire = Math.max(0, parseFloat($('tire').value)||0);
+    const speed = Math.max(40, parseFloat($('speed').value)||65);
+
+    const baseline = baseCity*(1-mix) + baseHwy*mix;
+
+    const towPenalty = 0.004 * towing;
+    const inclinePenalty = 0.03 * incline;
+    const windPenalty = 0.01 * wind;
+    const weightPenalty = 0.005 * (extraWeight/100);
+    const tirePenalty = 0.01 * tire;
+    const speedPenalty = speed > 60 ? 0.005 * (speed - 60) : (speed < 55 ? -0.005 * (55 - speed) : 0);
+
+    let totalPenalty = towPenalty + inclinePenalty + windPenalty + weightPenalty + tirePenalty + speedPenalty;
+    if(totalPenalty < -0.15) totalPenalty = -0.15;
+    if(totalPenalty > 0.75) totalPenalty = 0.75;
+
+    const adjustedMPG = Math.max(3, baseline / (1 + totalPenalty));
+    const milesPerTank = Math.round(adjustedMPG * tank);
+
+    const breakdown = [
+      `Baseline MPG (weighted): ${round(baseline,2)} MPG`,
+      `Towing penalty: ${(towPenalty*100).toFixed(1)}%`,
+      `Incline penalty: ${(inclinePenalty*100).toFixed(1)}%`,
+      `Wind penalty: ${(windPenalty*100).toFixed(1)}%`,
+      `Extra-weight penalty: ${(weightPenalty*100).toFixed(2)}%`,
+      `Tire/drag penalty: ${(tirePenalty*100).toFixed(1)}%`,
+      `Speed penalty: ${(speedPenalty*100).toFixed(1)}%`,
+      `Combined penalty factor applied: ${(totalPenalty*100).toFixed(1)}%`
+    ].join('; ');
+
+    $('adjMPG').textContent = round(adjustedMPG,2);
+    $('milesTank').textContent = milesPerTank.toLocaleString();
+    $('breakdown').textContent = breakdown;
+    $('resultArea').style.display = 'block';
+  }
+
+  $('calcBtn').addEventListener('click', estimate);
+
+  function clamp(v,min,max){ return Math.min(max,Math.max(min,v)); }
+  function round(v,d){ const p=Math.pow(10,d||2); return Math.round(v*p)/p; }
+
+  reset();
+})();
+</script>
+</body>
+</html>
